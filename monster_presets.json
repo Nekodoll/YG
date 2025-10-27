@@ -1,0 +1,57 @@
+[
+  {
+    "name": "All Monsters",
+    "monsters": [
+      "Senile Tiger",
+      "Man Cow",
+      "Boor",
+      "Round Crab",
+      "Country Rat",
+      "Blue Lobster",
+      "Cyclops Vine",
+      "Dang-Fly",
+      "Fruit Brothers",
+      "Green Hopper",
+      "Monster Tree",
+      "Shaman Ladybugs"
+    ],
+    "description": "All available monsters"
+  },
+  {
+    "name": "Low Level",
+    "monsters": [
+      "Pink Pig",
+      "Country Rat",
+      "Green Mushroom Boy"
+    ],
+    "description": "Good for beginners"
+  },
+  {
+    "name": "Medium Level",
+    "monsters": [
+      "Senile Tiger",
+      "Man Cow",
+      "Boor",
+      "Round Crab"
+    ],
+    "description": "Balanced exp and loot"
+  },
+  {
+    "name": "High Level",
+    "monsters": [
+      "Boss Mushroom",
+      "Princess Piggy",
+      "Wild Boar"
+    ],
+    "description": "High value targets"
+  },
+  {
+    "name": "Farm",
+    "monsters": [
+      "Shaman Ladybugs",
+      "Green Hopper",
+      "Blue Lobster"
+    ],
+    "description": "Good for farming"
+  }
+]
