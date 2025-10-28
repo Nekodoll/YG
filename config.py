@@ -196,13 +196,13 @@ FAILED_POSITION_MEMORY = 15
 # ============================================================================
 
 # Health management
-HP_THRESHOLD = 100  # Use healing when HP drops below this
+HP_THRESHOLD = 10  # Use healing when HP drops below this
 HP_SHORTCUT = win32con.VK_F1  # F1 key for healing
 HP_CHECK_INTERVAL = 0.3  # Check HP every 300ms (fast)
 HP_COOLDOWN_DURATION = 1.0  # Minimum time between HP potions
 
 # Magic management
-MP_THRESHOLD = 50  # Use mana potion when MP drops below this
+MP_THRESHOLD = 5  # Use mana potion when MP drops below this
 MP_SHORTCUT = win32con.VK_F3  # F3 key for mana restoration
 MP_CHECK_INTERVAL = 0.3  # Check MP every 300ms
 MP_COOLDOWN_DURATION = 3  # Seconds between MP potion usage
@@ -553,4 +553,5 @@ def print_config_summary():
 
 # Auto-print summary if not imported as module
 if __name__ == "__main__":
+
     print_config_summary()
