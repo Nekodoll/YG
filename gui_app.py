@@ -1,5 +1,5 @@
-# gui_app.py - Modern GUI for YOLOv8 Game Bot
-# High-performance GUI with real-time monitoring
+# gui_app_patched.py - Improved GUI for YOLOv8 Game Bot
+# Fixed hunger detection and improved monster management
 
 import tkinter as tk
 from tkinter import ttk, filedialog, messagebox
@@ -144,7 +144,7 @@ class BotGUI:
     def __init__(self):
         self.root = tk.Tk()
         self.root.title("YOLOv8 Game Bot")
-        self.root.geometry("700x700")
+        self.root.geometry("700x750")  # Increased height for delete button
         self.root.resizable(True, True)
         
         # State management
@@ -155,7 +155,11 @@ class BotGUI:
         self.monster_presets = []
         self.selected_monsters = []
         
-        # Load available monsters from config
+        # File paths for persistence
+        self.monsters_file = "custom_monsters.json"
+        self.presets_file = "monster_presets.json"
+        
+        # Load available monsters from file or config
         self._load_available_monsters()
         
         # Load presets
@@ -176,8 +180,20 @@ class BotGUI:
         self._update_gui()
         
     def _load_available_monsters(self):
-        """Load available monsters from config or use defaults"""
-        # Try to get from config
+        """Load available monsters from custom file, config, or use defaults"""
+        # First try to load from custom monsters file
+        if Path(self.monsters_file).exists():
+            try:
+                with open(self.monsters_file, 'r') as f:
+                    data = json.load(f)
+                    self.available_monsters = data.get('monsters', [])
+                    if self.available_monsters:
+                        self.selected_monsters = self.available_monsters.copy()
+                        return
+            except Exception as e:
+                logging.warning(f"Failed to load custom monsters: {e}")
+        
+        # If custom file doesn't exist or failed, try to get from config
         if hasattr(config, 'MONSTER_CLASSES'):
             self.available_monsters = config.MONSTER_CLASSES.copy()
         else:
@@ -208,9 +224,23 @@ class BotGUI:
         
         self.selected_monsters = self.available_monsters.copy()
         
+        # Save the initial list to custom file
+        self._save_monsters()
+    
+    def _save_monsters(self):
+        """Save the current monster list to file"""
+        try:
+            data = {
+                'monsters': self.available_monsters,
+                'last_updated': time.strftime("%Y-%m-%d %H:%M:%S")
+            }
+            with open(self.monsters_file, 'w') as f:
+                json.dump(data, f, indent=2)
+        except Exception as e:
+            logging.error(f"Failed to save monsters: {e}")
+    
     def _load_presets(self):
         """Load monster presets from file"""
-        presets_file = "monster_presets.json"
         default_presets = [
             MonsterPreset("All Monsters", self.available_monsters, "All available monsters"),
             MonsterPreset("Low Level", ["Pink Pig", "Country Rat", "Green Mushroom Boy"], "Good for beginners"),
@@ -220,8 +250,8 @@ class BotGUI:
         ]
         
         try:
-            if Path(presets_file).exists():
-                with open(presets_file, 'r') as f:
+            if Path(self.presets_file).exists():
+                with open(self.presets_file, 'r') as f:
                     data = json.load(f)
                     self.monster_presets = [MonsterPreset.from_dict(p) for p in data]
             else:
@@ -233,7 +263,7 @@ class BotGUI:
     def _save_presets(self):
         """Save monster presets to file"""
         try:
-            with open("monster_presets.json", 'w') as f:
+            with open(self.presets_file, 'w') as f:
                 json.dump([p.to_dict() for p in self.monster_presets], f, indent=2)
         except:
             pass
@@ -305,12 +335,6 @@ class BotGUI:
         main_frame.columnconfigure(0, weight=1)
         main_frame.rowconfigure(1, weight=1)
         
-        # Title
-        '''
-        title = ttk.Label(main_frame, text="YOLOv8 Game Bot Control Panel", 
-                         style="Title.TLabel")
-        title.grid(row=0, column=0, pady=(0, 10), sticky="w")
-        '''
         # Create notebook for tabs
         self.notebook = ttk.Notebook(main_frame)
         self.notebook.grid(row=1, column=0, sticky="nsew")
@@ -320,7 +344,7 @@ class BotGUI:
         self._create_monster_tab()
         self._create_monitor_tab()
         
-        # Bottom panel - Status and controls (removed config button)
+        # Bottom panel - Status and controls
         self._create_control_panel(main_frame)
         
     def _create_config_tab(self):
@@ -419,7 +443,7 @@ class BotGUI:
         ttk.Label(right_frame, text="HP Threshold:", style="Info.TLabel").grid(
             row=1, column=0, sticky="w", pady=5)
         
-        self.hp_threshold_var = tk.IntVar(value=getattr(config, 'HP_THRESHOLD', 100))
+        self.hp_threshold_var = tk.IntVar(value=getattr(config, 'HP_THRESHOLD', 20))
         hp_spinbox = ttk.Spinbox(right_frame, from_=0, to=10000, textvariable=self.hp_threshold_var, width=10)
         hp_spinbox.grid(row=1, column=1, sticky="w", pady=5)
         
@@ -437,7 +461,7 @@ class BotGUI:
         ttk.Label(right_frame, text="MP Threshold:", style="Info.TLabel").grid(
             row=3, column=0, sticky="w", pady=5)
         
-        self.mp_threshold_var = tk.IntVar(value=getattr(config, 'MP_THRESHOLD', 50))
+        self.mp_threshold_var = tk.IntVar(value=getattr(config, 'MP_THRESHOLD', 5))
         mp_spinbox = ttk.Spinbox(right_frame, from_=0, to=10000, textvariable=self.mp_threshold_var, width=10)
         mp_spinbox.grid(row=3, column=1, sticky="w", pady=5)
         
@@ -479,17 +503,25 @@ class BotGUI:
                                       state="readonly", width=8)
         food_key_combo.grid(row=7, column=1, sticky="w", pady=5)
         
+        # Hunger Threshold (NEW)
+        ttk.Label(right_frame, text="Hunger Threshold:", style="Info.TLabel").grid(
+            row=8, column=0, sticky="w", pady=5)
+        
+        self.hunger_threshold_var = tk.IntVar(value=0)
+        hunger_spinbox = ttk.Spinbox(right_frame, from_=-1000, to=1000, textvariable=self.hunger_threshold_var, width=10)
+        hunger_spinbox.grid(row=8, column=1, sticky="w", pady=5)
+        
         # Performance settings (moved down)
         perf_label = ttk.Label(right_frame, text="⚡ Performance", style="Header.TLabel")
-        perf_label.grid(row=8, column=0, columnspan=2, sticky="w", pady=(20, 10))
+        perf_label.grid(row=9, column=0, columnspan=2, sticky="w", pady=(20, 10))
         
         # Detection interval
         ttk.Label(right_frame, text="Detection Speed:", style="Info.TLabel").grid(
-            row=9, column=0, sticky="w", pady=5)
+            row=10, column=0, sticky="w", pady=5)
         
         self.speed_var = tk.StringVar(value="normal")
         speed_frame = ttk.Frame(right_frame, style="Tab.TFrame")
-        speed_frame.grid(row=9, column=1, sticky="w", pady=5)
+        speed_frame.grid(row=10, column=1, sticky="w", pady=5)
         
         ttk.Radiobutton(speed_frame, text="Fast", variable=self.speed_var,
                        value="fast").pack(side="left", padx=(0, 5))
@@ -500,15 +532,15 @@ class BotGUI:
         
         # Confidence threshold
         ttk.Label(right_frame, text="Confidence:", style="Info.TLabel").grid(
-            row=10, column=0, sticky="w", pady=5)
+            row=11, column=0, sticky="w", pady=5)
         
         self.confidence_var = tk.DoubleVar(value=0.6)
         confidence_scale = ttk.Scale(right_frame, from_=0.1, to=1.0, 
                                     variable=self.confidence_var, orient="horizontal", length=150)
-        confidence_scale.grid(row=10, column=1, sticky="w", pady=5)
+        confidence_scale.grid(row=11, column=1, sticky="w", pady=5)
         
         self.confidence_label = ttk.Label(right_frame, text="0.60", style="Info.TLabel")
-        self.confidence_label.grid(row=10, column=2, sticky="w", padx=5)
+        self.confidence_label.grid(row=11, column=2, sticky="w", padx=5)
         
         # Update confidence label
         def update_confidence_label(value):
@@ -633,8 +665,36 @@ class BotGUI:
         ttk.Button(quick_frame, text="Reset to Default", 
                   command=self._reset_monsters).pack(side="left", padx=5)
         
+        # Add new monster functionality
+        add_frame = ttk.Frame(right_frame, style="Tab.TFrame")
+        add_frame.grid(row=4, column=0, columnspan=2, sticky="ew", pady=10)
+        
+        ttk.Label(add_frame, text="Add New Monster:", style="Info.TLabel").pack(side="left", padx=5)
+        
+        self.new_monster_var = tk.StringVar()
+        new_monster_entry = ttk.Entry(add_frame, textvariable=self.new_monster_var, width=20)
+        new_monster_entry.pack(side="left", padx=5)
+        
+        ttk.Button(add_frame, text="Add", 
+                  command=self._add_new_monster).pack(side="left", padx=5)
+        
+        # Delete monster functionality (NEW)
+        delete_frame = ttk.Frame(right_frame, style="Tab.TFrame")
+        delete_frame.grid(row=5, column=0, columnspan=2, sticky="ew", pady=10)
+        
+        ttk.Label(delete_frame, text="Delete Monster:", style="Info.TLabel").pack(side="left", padx=5)
+        
+        self.delete_monster_var = tk.StringVar()
+        self.delete_monster_combo = ttk.Combobox(delete_frame, textvariable=self.delete_monster_var, 
+                                                state="readonly", width=20)
+        self.delete_monster_combo.pack(side="left", padx=5)
+        
+        ttk.Button(delete_frame, text="Delete", 
+                  command=self._delete_monster).pack(side="left", padx=5)
+        
         # Update monster lists
         self._update_monster_lists()
+        self._update_delete_monster_combo()
         
     def _create_monitor_tab(self):
         """Create monitoring tab"""
@@ -702,7 +762,7 @@ class BotGUI:
                   command=self._clear_log).grid(row=1, column=0, pady=(5, 0), sticky="e")
         
     def _create_control_panel(self, parent):
-        """Create control panel (removed config button)"""
+        """Create control panel"""
         control_frame = ttk.Frame(parent, style="Main.TFrame")
         control_frame.grid(row=2, column=0, pady=(10, 0), sticky="ew")
         
@@ -745,6 +805,15 @@ class BotGUI:
         self.selected_listbox.delete(0, tk.END)
         for monster in self.selected_monsters:
             self.selected_listbox.insert(tk.END, monster)
+        
+        # Update delete monster combo
+        self._update_delete_monster_combo()
+    
+    def _update_delete_monster_combo(self):
+        """Update the delete monster combobox with all available monsters"""
+        self.delete_monster_combo['values'] = sorted(self.available_monsters)
+        if self.available_monsters:
+            self.delete_monster_combo.current(0)
     
     def _filter_monsters(self, event=None):
         """Filter monsters based on search"""
@@ -789,6 +858,50 @@ class BotGUI:
         """Reset to default monster selection"""
         self.selected_monsters = self.available_monsters.copy()
         self._update_monster_lists()
+    
+    def _add_new_monster(self):
+        """Add a new monster to the available list"""
+        new_monster = self.new_monster_var.get().strip()
+        if new_monster and new_monster not in self.available_monsters:
+            self.available_monsters.append(new_monster)
+            self._update_monster_lists()
+            self._save_monsters()  # Save to file
+            self.new_monster_var.set("")
+            self.log_queue.put(('log', f"Added new monster: {new_monster}"))
+        elif new_monster in self.available_monsters:
+            messagebox.showwarning("Warning", f"'{new_monster}' already exists in the monster list")
+    
+    def _delete_monster(self):
+        """Delete a monster from the available list"""
+        monster_to_delete = self.delete_monster_var.get()
+        
+        if not monster_to_delete:
+            messagebox.showwarning("Warning", "Please select a monster to delete")
+            return
+        
+        # Confirm deletion
+        if messagebox.askyesno("Delete Monster", 
+                              f"Are you sure you want to delete '{monster_to_delete}' from the monster list?\n\n"
+                              f"This will remove it from both available and selected lists."):
+            # Remove from available monsters
+            if monster_to_delete in self.available_monsters:
+                self.available_monsters.remove(monster_to_delete)
+            
+            # Remove from selected monsters if present
+            if monster_to_delete in self.selected_monsters:
+                self.selected_monsters.remove(monster_to_delete)
+            
+            # Update all lists
+            self._update_monster_lists()
+            
+            # Save to file to persist the change
+            self._save_monsters()
+            
+            # Log the deletion
+            self.log_queue.put(('log', f"Deleted monster: {monster_to_delete}"))
+            
+            # Clear the selection
+            self.delete_monster_var.set("")
     
     def _load_preset(self):
         """Load selected preset"""
@@ -924,6 +1037,9 @@ class BotGUI:
         config.MP_SHORTCUT = self._get_key_code(self.mp_key_var.get())
         config.GP_SHORTCUT = self._get_key_code(self.gp_key_var.get())
         config.FOOD_SHORTCUT = self._get_key_code(self.food_key_var.get())
+        
+        # Update hunger threshold (NEW)
+        config.HUNGER_THRESHOLD = self.hunger_threshold_var.get()
         
         # Get configuration
         model_path = self.model_var.get()
