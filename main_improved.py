@@ -284,6 +284,128 @@ class ImprovedBotInstance:
             logger.error(f"Bot startup error: {e}")
         finally:
             self.stop()
+
+    def _stats_monitor_thread(self):
+        """Monitor and manage HP/MP/GP/Food"""
+        logger.info(f"[{self.bot.title}] Stats monitor started")
+        
+        check_intervals = {
+            'hp': config.HP_CHECK_INTERVAL,
+            'mp': config.HP_CHECK_INTERVAL,
+            'gp': config.STATS_CHECK_DELAY,
+            'food': config.STATS_CHECK_DELAY
+        }
+        
+        last_checks = {key: 0 for key in check_intervals}
+        
+        while self.is_running and self.bot.is_valid():
+            try:
+                current_time = time.time()
+                
+                # HP Check
+                if (current_time - last_checks['hp']) >= check_intervals['hp']:
+                    hp_value = self.bot.read_pointer_chain(
+                        config.BASE_ADDRESS, config.HP_OFFSETS
+                    )
+                    
+                    if hp_value and hp_value < config.HP_THRESHOLD:
+                        if (current_time - self.last_usage_times['hp']) > 1.0:
+                            logger.info(f"[{self.bot.title}] Low HP ({hp_value}), using F1")
+                            if self.bot.send_key(config.HP_SHORTCUT):
+                                self.last_usage_times['hp'] = current_time
+                                time.sleep(0.3)
+                    
+                    last_checks['hp'] = current_time
+                
+                # MP Check
+                if (current_time - last_checks['mp']) >= check_intervals['mp']:
+                    mp_value = self.bot.read_pointer_chain(
+                        config.BASE_ADDRESS, config.MP_OFFSETS
+                    )
+                    
+                    if mp_value and mp_value < config.MP_THRESHOLD:
+                        if (current_time - self.last_usage_times['mp']) > config.MP_COOLDOWN_DURATION:
+                            logger.info(f"[{self.bot.title}] Low MP ({mp_value}), using F3")
+                            if self.bot.send_key(config.MP_SHORTCUT):
+                                self.last_usage_times['mp'] = current_time
+                                time.sleep(0.3)
+                    
+                    last_checks['mp'] = current_time
+                
+                # GP Check (FIXED - try multiple reading methods)
+                if config.ENABLE_GP_CHECK and (current_time - last_checks['gp']) >= check_intervals['gp']:
+                    gp_value = None
+                    
+                    # Try reading as byte first
+                    gp_value = self.bot.read_pointer_chain_byte(
+                        config.BASE_ADDRESS, config.GP_OFFSETS
+                    )
+                    
+                    # If byte reading fails, try reading as short
+                    if gp_value is None:
+                        gp_value = self.bot.read_pointer_chain_short(
+                            config.BASE_ADDRESS, config.GP_OFFSETS
+                        )
+                    
+                    # If still None, try reading as int (last resort)
+                    if gp_value is None:
+                        gp_value = self.bot.read_pointer_chain(
+                            config.BASE_ADDRESS, config.GP_OFFSETS
+                        )
+                        # If we got an int, try to extract a reasonable value
+                        if gp_value is not None:
+                            # Try to extract a byte from the int
+                            gp_value = gp_value & 0xFF
+                    
+                    # Debug logging
+                    if gp_value is not None:
+                        logger.debug(f"[{self.bot.title}] GP value: {gp_value}")
+                    
+                    if gp_value is not None and gp_value < config.GP_THRESHOLD:
+                        if (current_time - self.last_usage_times['gp']) > config.GP_COOLDOWN_DURATION:
+                            logger.info(f"[{self.bot.title}] Low GP ({gp_value}), using F5")
+                            if self.bot.send_key(config.GP_SHORTCUT):
+                                self.last_usage_times['gp'] = current_time
+                                time.sleep(0.3)
+                    
+                    last_checks['gp'] = current_time
+                
+                # Food Check (IMPROVED)
+                if self.enable_food_check and (current_time - last_checks['food']) >= check_intervals['food']:
+                    hunger_value = self.bot.read_pointer_chain(
+                        config.BASE_ADDRESS, config.HUNGER_OFFSETS
+                    )
+                    
+                    if hunger_value is not None:
+                        # Convert to signed
+                        signed_hunger = hunger_value if hunger_value < 32768 else hunger_value - 65536
+                        
+                        # Use configurable threshold (default to 0)
+                        hunger_threshold = getattr(config, 'HUNGER_THRESHOLD', 0)
+                        
+                        # Debug logging
+                        logger.debug(f"[{self.bot.title}] Hunger value: {signed_hunger}, threshold: {hunger_threshold}")
+                        
+                        # Check if hungry (below threshold)
+                        if signed_hunger < hunger_threshold:
+                            if (current_time - self.last_usage_times['food']) > config.FOOD_COOLDOWN_DURATION:
+                                logger.info(f"[{self.bot.title}] Hungry ({signed_hunger}), using F2")
+                                if self.bot.send_key(config.FOOD_SHORTCUT):
+                                    self.last_usage_times['food'] = current_time
+                                    time.sleep(0.3)
+                    
+                    last_checks['food'] = current_time
+                
+                time.sleep(0.05)
+                
+            except Exception as e:
+                logger.error(f"[{self.bot.title}] Stats monitor error: {e}")
+                time.sleep(1)
+        
+        logger.info(f"[{self.bot.title}] Stats monitor stopped")
+
+
+
     
     def _init_window_properties(self):
         """Initialize window properties and target selector"""
